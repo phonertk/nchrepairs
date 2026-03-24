@@ -5,6 +5,16 @@ import { createClient } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import { fmtDate, fmtDateTime, statusBadge, prioBadge } from '@/lib/helpers'
 
+async function notifyTelegram(message: string) {
+  try {
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    })
+  } catch {}
+}
+
 export default function AdminTickets() {
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -47,6 +57,24 @@ export default function AdminTickets() {
       await supabase.from('ticket_logs').insert(logLines.map(msg => ({ ticket_id: selected.id, message: msg, created_by: 'admin' })))
     }
     setSaving(false); setSelected(null); setToast('✅ อัปเดตสำเร็จ')
+
+    // แจ้งเตือน Telegram
+    const statusLabel: Record<string,string> = {
+      pending:'⏳ รอดำเนินการ', progress:'🔄 กำลังซ่อม', done:'✅ ซ่อมเสร็จแล้ว', cancel:'❌ ยกเลิก'
+    }
+    if (selected.status !== upd.status) {
+      await notifyTelegram(
+`🔔 <b>อัปเดตสถานะคำร้อง</b>
+━━━━━━━━━━━━━━━
+🎫 รหัส: <b>${selected.ticket_no}</b>
+📌 หัวข้อ: ${selected.title}
+👤 ผู้แจ้ง: ${selected.user_name || '-'}
+📊 สถานะใหม่: <b>${statusLabel[upd.status]}</b>
+${upd.note ? `💬 หมายเหตุ: ${upd.note}` : ''}
+━━━━━━━━━━━━━━━`
+      )
+    }
+
     await load()
   }
 

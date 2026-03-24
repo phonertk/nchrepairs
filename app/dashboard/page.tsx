@@ -6,6 +6,16 @@ import Navbar from '@/components/Navbar'
 import Toast from '@/components/Toast'
 import { fmtDate, fmtDateTime, statusBadge, prioBadge } from '@/lib/helpers'
 
+async function notifyTelegram(message: string) {
+  try {
+    await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    })
+  } catch {}
+}
+
 type Ticket = any
 type Profile = { id: string; full_name: string; role: string }
 
@@ -68,6 +78,21 @@ export default function Dashboard() {
     await supabase.from('ticket_logs').insert({
       ticket_id: tkt.id, message: 'รับคำร้องแล้ว รอการดำเนินการ', created_by: 'system'
     })
+
+    // แจ้งเตือน Telegram
+    const prioLabel: Record<string,string> = { high:'🔴 เร่งด่วน', med:'🟡 ปานกลาง', low:'🟢 ปกติ' }
+    await notifyTelegram(
+`🔧 <b>คำร้องซ่อมใหม่!</b>
+━━━━━━━━━━━━━━━
+🎫 รหัส: <b>${tkt.ticket_no}</b>
+📌 หัวข้อ: ${tkt.title}
+🔩 ประเภท: ${tkt.type}
+📍 สถานที่: ${tkt.location || 'ไม่ระบุ'}
+⚡ ความสำคัญ: ${prioLabel[tkt.priority] || tkt.priority}
+👤 ผู้แจ้ง: ${profile!.full_name}
+━━━━━━━━━━━━━━━
+กรุณาตรวจสอบใน Admin Dashboard`
+    )
 
     setNt({ title:'', type:'', priority:'med', location:'', desc:'', phone:'' })
     setNtLoading(false)
